@@ -1,0 +1,7 @@
+[package]
+name = "name-lookup"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bloom-filter-yss = "0.1.0"
