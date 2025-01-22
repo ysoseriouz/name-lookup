@@ -1,23 +1,29 @@
-use bloom_filter_yss::bloom_filter::BloomFilter;
+use bloom_filter_yss::BloomFilter;
+use sqlx::{postgres::PgPoolOptions, PgPool};
+use std::error::Error;
 
-fn lookup(bloom_filter: &BloomFilter, s: &str) {
-    if bloom_filter.lookup(s) {
-        println!("Exist: {}", s);
-    } else {
-        println!("Not exist: {}", s);
-    }
+fn prepare_test_data() -> Vec<String> {
+    (1..1_000_000).map(|i| format!("test{}", i)).collect()
 }
 
-fn main() {
-    let mut bloom_filter = BloomFilter::new(10);
-    bloom_filter.insert("abound");
-    bloom_filter.insert("abound1");
-    bloom_filter.insert("abound");
+async fn count_names(pool: &PgPool) -> Result<(), sqlx::Error> {
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM names")
+        .fetch_one(pool)
+        .await?;
 
-    lookup(&bloom_filter, "abound");
-    lookup(&bloom_filter, "aboundd");
+    println!("Record: {}", count.0);
 
-    bloom_filter.insert("test");
+    Ok(())
+}
 
-    lookup(&bloom_filter, "test");
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let database_url = dotenvy::var("DATABASE_URL")?;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await?;
+    count_names(&pool).await?;
+
+    Ok(())
 }
