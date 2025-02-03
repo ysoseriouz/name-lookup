@@ -1,20 +1,13 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="/assets/main.css" rel="stylesheet" />
-    <link href="https://rsms.me/inter/inter.css" rel="stylesheet" />
-  </head>
+{% extends "base.html" %}
 
-  <body>
-    <h1 class="text-green-500">Howdy!</h1>
-    <form action="/" method="post">
-      <label for="name">
-        Enter your name:
-        <input type="text" name="name" />
-      </label>
-      <input type="submit" value="Subscribe!" />
-    </form>
-  </body>
-</html>
+{% block title %}Name lookup{% endblock %}
+
+{% block content %}
+<form action="/" method="post">
+  <label for="name">
+    Enter your name:
+    <input type="text" name="name" />
+  </label>
+  <input type="submit" value="Subscribe!" />
+</form>
+{% endblock %}
