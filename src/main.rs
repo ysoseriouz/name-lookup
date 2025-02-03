@@ -1,94 +1,57 @@
-use bloom_filter_yss::BloomFilter;
-use futures::TryStreamExt;
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
-use std::error::Error;
+mod error;
+mod html_template;
+mod initializer;
 
-fn prepare_test_data(n: usize) -> Vec<String> {
-    (1..=n).map(|i| format!("test{}", i)).collect()
-}
+use anyhow::{Context, Result};
+use axum::{extract::State, http::StatusCode, routing::get, Router};
+use error::internal_error;
+use initializer::{initialize, AppState};
+use tower_http::services::ServeDir;
+use tracing::info;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-async fn count_names(pool: &PgPool) -> Result<i64, sqlx::Error> {
-    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM names")
-        .fetch_one(pool)
-        .await?;
+async fn root(State(app_state): State<AppState>) -> Result<String, (StatusCode, String)> {
+    let row = sqlx::query!("SELECT name FROM names ORDER BY random() LIMIT 1")
+        .fetch_one(&app_state.pool)
+        .await
+        .map_err(internal_error)?;
 
-    Ok(count.0)
-}
-
-async fn bulk_insert(pool: &PgPool, names: &[String]) -> Result<u64, sqlx::Error> {
-    if names.is_empty() {
-        return Ok(0);
-    }
-    let sql_params = names
-        .iter()
-        .map(|name| format!("('{}')", name))
-        .collect::<Vec<String>>()
-        .join(", ");
-    let query = format!(
-        r#"
-        INSERT INTO names (name)
-        VALUES {}
-        ON CONFLICT (name) DO NOTHING
-        "#,
-        sql_params
-    );
-    let rows_affected = sqlx::query(&query).execute(pool).await?.rows_affected();
-
-    Ok(rows_affected)
-}
-
-async fn seed_data(pool: &PgPool, n: usize) -> Result<(), sqlx::Error> {
-    if n == 0 {
-        return Ok(());
-    }
-
-    let test_data = prepare_test_data(n);
-    let rows_inserted = bulk_insert(pool, &test_data).await?;
-    println!("Inserted {}", rows_inserted);
-
-    let number_of_names = count_names(pool).await?;
-    println!("Total records: {}", number_of_names);
-
-    Ok(())
-}
-
-async fn build_bloom_filter(pool: &PgPool, n: usize) -> Result<BloomFilter, sqlx::Error> {
-    let mut bloom_filter = BloomFilter::new(n);
-    let mut rows = sqlx::query("SELECT name FROM names").fetch(pool);
-
-    let mut i = 0;
-    while let Some(row) = rows.try_next().await? {
-        i += 1;
-        let name = row.try_get("name")?;
-        bloom_filter.insert(name);
-        if i >= n {
-            break;
-        }
-    }
-
-    Ok(bloom_filter)
-}
-
-fn lookup(bloom_filter: &BloomFilter, key: &str) {
-    if bloom_filter.lookup(key) {
-        println!("{} may exist", key);
-    } else {
-        println!("{} not exist", key);
-    }
+    Ok(row.name)
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let database_url = dotenvy::var("DATABASE_URL")?;
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await?;
-    seed_data(&pool, 0).await?;
+async fn main() -> Result<()> {
+    // Tracing
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| format!("{}=trace", env!("CARGO_CRATE_NAME")).into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
-    let bloom_filter = build_bloom_filter(&pool, 10_000_000).await?;
-    lookup(&bloom_filter, "test");
-    lookup(&bloom_filter, "test1");
+    info!("Initialize database...");
+    let app_state = initialize().await?;
+    info!("Database initialized!");
+
+    info!("Initialize router...");
+    let app = Router::new()
+        .route("/", get(root))
+        .route(
+            "/lookup",
+            get(html_template::lookup::show_form).post(html_template::lookup::accept_form),
+        )
+        .nest_service("/assets", ServeDir::new("assets"))
+        .with_state(app_state);
+
+    let port = 3000;
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    info!("Router initialized, now listening on port {}", port);
+
+    axum::serve(listener, app)
+        .await
+        .context("Error while starting server")?;
 
     Ok(())
 }
