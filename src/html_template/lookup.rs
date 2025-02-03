@@ -1,33 +1,47 @@
 use super::HtmlTemplate;
-use crate::{error::internal_error, AppState, State};
+use crate::{AppState, State};
 use askama::Template;
-use axum::{extract::Form, http::StatusCode};
+use axum::extract::Form;
 use serde::Deserialize;
 
 #[derive(Template)]
-#[template(path = "lookup.html")]
-pub struct LookupTemplate;
+#[template(path = "lookup/index.html")]
+struct IndexTemplate;
 
-pub async fn show() -> HtmlTemplate<LookupTemplate> {
-    let template = LookupTemplate {};
-    HtmlTemplate(template)
+#[derive(Template)]
+#[template(path = "lookup/response.html")]
+struct ResponseTemplate<'a> {
+    message: &'a str,
+    text_color: &'a str,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct AddNameRequest {
+pub struct Request {
     name: String,
+}
+
+pub async fn index() -> impl super::IntoResponse {
+    let template = IndexTemplate {};
+    HtmlTemplate(template)
 }
 
 pub async fn add_name(
     State(state): State<AppState>,
-    Form(request): Form<AddNameRequest>,
-) -> Result<String, (StatusCode, String)> {
-    let mut bloom_filter = state.bloom_filter.lock().map_err(internal_error)?;
-
-    if bloom_filter.lookup(&request.name) {
-        Ok("Already exists, come up with another name pls...".to_string())
+    Form(request): Form<Request>,
+) -> impl super::IntoResponse {
+    let mut bloom_filter = state.bloom_filter.lock().unwrap();
+    let template = if bloom_filter.lookup(&request.name) {
+        ResponseTemplate {
+            message: "Another name plz!",
+            text_color: "text-red-800",
+        }
     } else {
         bloom_filter.insert(&request.name);
-        Ok("Nice name!".to_string())
-    }
+        ResponseTemplate {
+            message: "Noice!",
+            text_color: "text-blue-800",
+        }
+    };
+
+    HtmlTemplate(template)
 }
