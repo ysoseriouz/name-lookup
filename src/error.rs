@@ -4,5 +4,10 @@ pub fn internal_error<E>(err: E) -> (StatusCode, String)
 where
     E: std::error::Error,
 {
-    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+    tracing::error!(%err);
+
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Something went wrong".to_owned(),
+    )
 }
