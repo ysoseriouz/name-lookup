@@ -36,10 +36,10 @@ async fn main() -> Result<()> {
 
     info!("Initialize router...");
     let app = Router::new()
-        .route("/", get(root))
+        .route("/", get(root).post(root))
         .route(
             "/lookup",
-            get(html_template::lookup::show_form).post(html_template::lookup::accept_form),
+            get(html_template::lookup::show).post(html_template::lookup::add_name),
         )
         .nest_service("/assets", ServeDir::new("assets"))
         .with_state(app_state);

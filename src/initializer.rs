@@ -7,6 +7,7 @@ use anyhow::Result;
 use bloom_filter_yss::{BloomFilter, BloomFilterBuilder};
 use futures::TryStreamExt;
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use std::sync::{Arc, Mutex};
 
 pub async fn build_bloom_filter(pool: &PgPool, n: usize) -> Result<BloomFilter> {
     let path = dotenvy::var("LOCAL_BLOOM_FILTER_PATH")?;
@@ -38,7 +39,10 @@ pub async fn initialize() -> Result<AppState> {
         .await?;
     seed::seed_data(&pool, 0).await?;
     let bloom_filter = build_bloom_filter(&pool, 10_000_000).await?;
-    let app_state = AppState { pool, bloom_filter };
+    let app_state = AppState {
+        pool,
+        bloom_filter: Arc::new(Mutex::new(bloom_filter)),
+    };
 
     Ok(app_state)
 }
