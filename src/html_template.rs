@@ -1,8 +1,11 @@
+mod html_error;
+pub mod joke;
 pub mod lookup;
 
 use super::error::internal_error;
 use askama::Template;
 use axum::response::{Html, IntoResponse, Response};
+pub use html_error::*;
 
 pub struct HtmlTemplate<T>(pub T);
 
@@ -17,3 +20,5 @@ where
         }
     }
 }
+
+pub type ResultHtml<T> = Result<HtmlTemplate<T>, HtmlError>;

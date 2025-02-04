@@ -1,4 +1,4 @@
-use super::HtmlTemplate;
+use super::{HtmlTemplate, ResultHtml};
 use crate::{AppState, State};
 use askama::Template;
 use axum::extract::Form;
@@ -6,11 +6,11 @@ use serde::Deserialize;
 
 #[derive(Template)]
 #[template(path = "lookup/index.html")]
-struct IndexTemplate;
+pub struct IndexTemplate;
 
 #[derive(Template)]
 #[template(path = "lookup/response.html")]
-struct ResponseTemplate<'a> {
+pub struct ResponseTemplate<'a> {
     message: &'a str,
     text_color: &'a str,
 }
@@ -20,16 +20,16 @@ pub struct Request {
     name: String,
 }
 
-pub async fn index() -> impl super::IntoResponse {
+pub async fn index() -> ResultHtml<IndexTemplate> {
     let template = IndexTemplate {};
-    HtmlTemplate(template)
+    Ok(HtmlTemplate(template))
 }
 
-pub async fn add_name(
+pub async fn add_name<'a>(
     State(state): State<AppState>,
     Form(request): Form<Request>,
-) -> impl super::IntoResponse {
-    let mut bloom_filter = state.bloom_filter.lock().unwrap();
+) -> ResultHtml<ResponseTemplate<'a>> {
+    let mut bloom_filter = state.bloom_filter.lock().await;
     let template = if bloom_filter.lookup(&request.name) {
         ResponseTemplate {
             message: "Another name plz!",
@@ -43,5 +43,5 @@ pub async fn add_name(
         }
     };
 
-    HtmlTemplate(template)
+    Ok(HtmlTemplate(template))
 }
