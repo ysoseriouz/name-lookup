@@ -51,6 +51,8 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/", get(html_template::lookup::index))
         .route("/lookup", post(html_template::lookup::add_name))
+        .route("/joke", get(html_template::joke::index))
+        .route("/joke/renew", get(html_template::joke::renew))
         .nest_service("/assets", ServeDir::new("assets"))
         .with_state(app_state.clone())
         .layer((trace_layer, timeout_layer));

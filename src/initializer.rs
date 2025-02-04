@@ -7,7 +7,8 @@ use anyhow::Result;
 use bloom_filter_yss::{BloomFilter, BloomFilterBuilder};
 use futures::TryStreamExt;
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub async fn build_bloom_filter(pool: &PgPool, n: usize) -> Result<BloomFilter> {
     let path = dotenvy::var("LOCAL_BLOOM_FILTER_PATH")?;
@@ -42,6 +43,7 @@ pub async fn initialize() -> Result<AppState> {
     let app_state = AppState {
         pool,
         bloom_filter: Arc::new(Mutex::new(bloom_filter)),
+        api_client: reqwest::Client::new(),
     };
 
     Ok(app_state)
