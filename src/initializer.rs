@@ -7,6 +7,8 @@ use anyhow::Result;
 use bloom_filter_yss::{BloomFilter, BloomFilterBuilder};
 use futures::TryStreamExt;
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -32,7 +34,21 @@ pub async fn build_bloom_filter(pool: &PgPool, n: usize) -> Result<BloomFilter> 
     Ok(bloom_filter)
 }
 
+fn prepare_local_disk() -> Result<()> {
+    let path = dotenvy::var("LOCAL_BLOOM_FILTER_PATH").unwrap();
+    let path = Path::new(&path);
+
+    if !path.exists() {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn initialize() -> Result<AppState> {
+    prepare_local_disk()?;
     let database_url = dotenvy::var("DATABASE_URL").unwrap();
     let pool = PgPoolOptions::new()
         .max_connections(5)
