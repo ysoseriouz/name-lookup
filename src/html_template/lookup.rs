@@ -1,8 +1,9 @@
-use super::{HtmlTemplate, ResultHtml};
+use super::{internal_error, HtmlTemplate, ResultHtml};
 use crate::{AppState, State};
 use askama::Template;
 use axum::extract::Form;
 use serde::Deserialize;
+use sqlx::PgPool;
 
 #[derive(Template)]
 #[template(path = "lookup/index.html")]
@@ -37,6 +38,9 @@ pub async fn add_name<'a>(
         }
     } else {
         bloom_filter.insert(&request.name);
+        insert_name_db(&state.pool, &request.name)
+            .await
+            .map_err(internal_error)?;
         ResponseTemplate {
             message: "Noice!",
             text_color: "text-blue-800",
@@ -44,4 +48,18 @@ pub async fn add_name<'a>(
     };
 
     Ok(HtmlTemplate(template))
+}
+
+async fn insert_name_db(pool: &PgPool, name: &str) -> anyhow::Result<()> {
+    sqlx::query!(
+        r#"
+            INSERT INTO names (name)
+            VALUES ($1)
+            ON CONFLICT (name) DO NOTHING
+        "#,
+        name
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
 }

@@ -1,7 +1,7 @@
 use super::HtmlTemplate;
 use askama::Template;
 use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse, Response};
+use axum::response::{IntoResponse, Response};
 use std::fmt::Display;
 use tracing::error;
 
