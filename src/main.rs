@@ -8,9 +8,7 @@ use axum::{
     Router,
 };
 use initializer::{initialize, AppState};
-use std::time::Duration;
-use tokio::net::TcpListener;
-use tokio::signal;
+use tokio::{net::TcpListener, signal};
 use tower_http::{
     compression::CompressionLayer, decompression::RequestDecompressionLayer, services::ServeDir,
     timeout::TimeoutLayer, trace::TraceLayer,
@@ -48,7 +46,7 @@ async fn main() -> Result<()> {
             debug_span!("request", %method, %uri, matched_path)
         })
         .on_failure(());
-    let timeout_layer = TimeoutLayer::new(Duration::from_secs(10));
+    let timeout_layer = TimeoutLayer::new(std::time::Duration::from_secs(10));
     let app = Router::new()
         .route("/", get(html_template::lookup::index))
         .route("/lookup", post(html_template::lookup::add_name))
