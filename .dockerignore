@@ -1,0 +1,11 @@
+/target
+/tmp
+/node_modules
+/static
+.dockerignore
+/.git
+.env
+.env.*
+.gitignore
+Dockerfile
+compose.yaml

@@ -51,15 +51,14 @@ pub async fn add_name<'a>(
 }
 
 async fn insert_name_db(pool: &PgPool, name: &str) -> anyhow::Result<()> {
-    sqlx::query!(
+    let query = format!(
         r#"
             INSERT INTO names (name)
-            VALUES ($1)
+            VALUES ('{}')
             ON CONFLICT (name) DO NOTHING
         "#,
-        name
-    )
-    .execute(pool)
-    .await?;
+        name,
+    );
+    sqlx::query(&query).execute(pool).await?;
     Ok(())
 }

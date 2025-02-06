@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
             listener.set_nonblocking(true)?;
             TcpListener::from_std(listener)?
         }
-        None => TcpListener::bind("127.0.0.1:3000").await?,
+        None => TcpListener::bind("0.0.0.0:3000").await?,
     };
     info!("Listening on {}", listener.local_addr()?);
 

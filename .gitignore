@@ -1,5 +1,6 @@
 /target
 /tmp
 .env
+.env.*
 /node_modules
 /static

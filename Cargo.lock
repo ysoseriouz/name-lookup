@@ -244,7 +244,9 @@ dependencies = [
 
 [[package]]
 name = "bloom-filter-yss"
-version = "0.3.2"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9db933d07de46d93098e3d17629458f97f89da13b96e7a12ac57ee3c6b31856f"
 dependencies = [
  "anyhow",
  "thiserror",
