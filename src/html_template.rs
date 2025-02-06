@@ -3,7 +3,10 @@ pub mod joke;
 pub mod lookup;
 
 use askama::Template;
-use axum::response::{Html, IntoResponse, Response};
+use axum::{
+    http::StatusCode,
+    response::{Html, IntoResponse, Response},
+};
 pub use html_error::*;
 
 pub struct HtmlTemplate<T>(pub T);
@@ -13,9 +16,17 @@ where
     T: Template,
 {
     fn into_response(self) -> Response {
+        let fallback_render = (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Something went wrong".to_owned(),
+        );
+
         match self.0.render() {
             Ok(html) => Html(html).into_response(),
-            Err(err) => internal_error(err).into_response(),
+            Err(err) => {
+                tracing::error!(%err);
+                fallback_render.into_response()
+            }
         }
     }
 }

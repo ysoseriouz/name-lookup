@@ -1,3 +1,4 @@
+use super::HtmlTemplate;
 use askama::Template;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
@@ -29,27 +30,21 @@ struct ErrorTemplate {
 
 impl IntoResponse for HtmlError {
     fn into_response(self) -> Response {
-        let template = ErrorTemplate {
+        let template = HtmlTemplate(ErrorTemplate {
             status_code: self.0,
             message: self.1.clone(),
-        };
-        match template.render() {
-            Ok(html) => (self.0, Html(html)).into_response(),
-            Err(err) => internal_error(err).into_response(),
-        }
+        });
+
+        (self.0, template).into_response()
     }
 }
 
-pub fn internal_error<E>(err: E) -> (StatusCode, String)
+pub fn internal_error<E>(err: E) -> HtmlError
 where
-    E: std::error::Error,
+    E: Into<anyhow::Error> + Display,
 {
-    tracing::error!(%err);
-
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "Something went wrong".to_owned(),
-    )
+    error!(%err);
+    HtmlError::internal_error("Oops, something went wrong")
 }
 
 pub fn bad_request<E>(err: E) -> HtmlError
