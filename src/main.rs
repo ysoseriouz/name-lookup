@@ -1,4 +1,3 @@
-mod error;
 mod html_template;
 mod initializer;
 
@@ -10,10 +9,12 @@ use axum::{
 };
 use initializer::{initialize, AppState};
 use std::time::Duration;
+use tokio::net::TcpListener;
 use tokio::signal;
-use tower_http::services::ServeDir;
-use tower_http::timeout::TimeoutLayer;
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    compression::CompressionLayer, decompression::RequestDecompressionLayer, services::ServeDir,
+    timeout::TimeoutLayer, trace::TraceLayer,
+};
 use tracing::{debug_span, error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -54,14 +55,23 @@ async fn main() -> Result<()> {
         .route("/joke", get(html_template::joke::index))
         .route("/joke/renew", get(html_template::joke::renew))
         .nest_service("/static", ServeDir::new("static"))
+        .layer(trace_layer)
+        .layer(timeout_layer)
+        .layer(RequestDecompressionLayer::new())
+        .layer(CompressionLayer::new())
         .with_state(app_state.clone())
-        .layer((trace_layer, timeout_layer));
+        .fallback(handler_404);
     info!("Initialized!");
 
-    let port = 3000;
-    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    info!("Listening on port {}", port);
+    let mut listenfd = listenfd::ListenFd::from_env();
+    let listener = match listenfd.take_tcp_listener(0).unwrap() {
+        Some(listener) => {
+            listener.set_nonblocking(true)?;
+            TcpListener::from_std(listener)?
+        }
+        None => TcpListener::bind("127.0.0.1:3000").await?,
+    };
+    info!("Listening on {}", listener.local_addr()?);
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(app_state))
@@ -69,6 +79,10 @@ async fn main() -> Result<()> {
         .context("Error while starting server")?;
 
     Ok(())
+}
+
+async fn handler_404() -> html_template::HtmlError {
+    html_template::HtmlError::not_found("Nothing here")
 }
 
 async fn save_state(state: AppState) {

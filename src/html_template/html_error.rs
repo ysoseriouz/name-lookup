@@ -1,7 +1,6 @@
-use super::HtmlTemplate;
 use askama::Template;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::response::{Html, IntoResponse, Response};
 use std::fmt::Display;
 use tracing::error;
 
@@ -15,6 +14,10 @@ impl HtmlError {
     pub fn bad_request(message: &str) -> Self {
         Self(StatusCode::BAD_REQUEST, message.to_owned())
     }
+
+    pub fn not_found(message: &str) -> Self {
+        Self(StatusCode::NOT_FOUND, message.to_owned())
+    }
 }
 
 #[derive(Template)]
@@ -26,20 +29,27 @@ struct ErrorTemplate {
 
 impl IntoResponse for HtmlError {
     fn into_response(self) -> Response {
-        let template = HtmlTemplate(ErrorTemplate {
+        let template = ErrorTemplate {
             status_code: self.0,
             message: self.1.clone(),
-        });
-        template.into_response()
+        };
+        match template.render() {
+            Ok(html) => (self.0, Html(html)).into_response(),
+            Err(err) => internal_error(err).into_response(),
+        }
     }
 }
 
-pub fn internal_error<E>(err: E) -> HtmlError
+pub fn internal_error<E>(err: E) -> (StatusCode, String)
 where
-    E: Into<anyhow::Error> + Display,
+    E: std::error::Error,
 {
-    error!(%err);
-    HtmlError::internal_error("Internal server error")
+    tracing::error!(%err);
+
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Something went wrong".to_owned(),
+    )
 }
 
 pub fn bad_request<E>(err: E) -> HtmlError
