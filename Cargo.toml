@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = "1.0.95"
 askama = "0.12.1"
 axum = "0.8.1"
-bloom-filter-yss = { path = "../bloom_filter" }
+bloom-filter-yss = "0.3.3"
 dotenvy = "0.15.7"
 futures = "0.3.31"
 listenfd = "1.0.2"
