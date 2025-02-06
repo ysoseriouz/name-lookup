@@ -3,17 +3,22 @@ mod initializer;
 
 use anyhow::{Context, Result};
 use axum::{
-    extract::{MatchedPath, Request, State},
+    body::Bytes,
+    extract::{MatchedPath, State},
+    http::{HeaderMap, Request},
+    response::Response,
     routing::{get, post},
     Router,
 };
 use initializer::{initialize, AppState};
+use std::time::Duration;
 use tokio::{net::TcpListener, signal};
 use tower_http::{
-    compression::CompressionLayer, decompression::RequestDecompressionLayer, services::ServeDir,
-    timeout::TimeoutLayer, trace::TraceLayer,
+    classify::ServerErrorsFailureClass, compression::CompressionLayer,
+    decompression::RequestDecompressionLayer, services::ServeDir, timeout::TimeoutLayer,
+    trace::TraceLayer,
 };
-use tracing::{debug_span, error, info};
+use tracing::{error, info, info_span, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -23,7 +28,7 @@ async fn main() -> Result<()> {
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
                 format!(
-                    "{}=debug,tower_http=debug,axum=trace",
+                    "{}=debug,tower_http=debug,axum::rejection=trace",
                     env!("CARGO_CRATE_NAME")
                 )
                 .into()
@@ -35,18 +40,25 @@ async fn main() -> Result<()> {
     info!("Initializing...");
     let app_state = initialize().await?;
     let trace_layer = TraceLayer::new_for_http()
-        .make_span_with(|req: &Request| {
-            let method = req.method();
-            let uri = req.uri();
+        .make_span_with(|req: &Request<_>| {
             let matched_path = req
                 .extensions()
                 .get::<MatchedPath>()
-                .map(|matched_path| matched_path.as_str());
+                .map(MatchedPath::as_str);
 
-            debug_span!("request", %method, %uri, matched_path)
+            info_span!(
+                "http_request",
+                method = ?req.method(),
+                matched_path,
+                some_other_field = tracing::field::Empty
+            )
         })
-        .on_failure(());
-    let timeout_layer = TimeoutLayer::new(std::time::Duration::from_secs(10));
+        .on_request(|_req: &Request<_>, _span: &Span| {})
+        .on_response(|_res: &Response, _latency: Duration, _span: &Span| {})
+        .on_body_chunk(|_chunk: &Bytes, _latency: Duration, _span: &Span| {})
+        .on_eos(|_trailers: Option<&HeaderMap>, _stream_duration: Duration, _span: &Span| {})
+        .on_failure(|_error: ServerErrorsFailureClass, _latency: Duration, _span: &Span| {});
+    let timeout_layer = TimeoutLayer::new(Duration::from_secs(10));
     let app = Router::new()
         .route("/", get(html_template::lookup::index))
         .route("/lookup", post(html_template::lookup::add_name))
