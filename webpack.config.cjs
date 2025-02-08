@@ -5,10 +5,8 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 module.exports = {
   entry: './assets/index.js',
   plugins: [
+    new HtmlWebpackPlugin(),
     new MiniCssExtractPlugin(),
-    new HtmlWebpackPlugin({
-      title: 'Bundle management',
-    }),
   ],
   output: {
     filename: 'bundle.js',
