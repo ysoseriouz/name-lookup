@@ -17,6 +17,7 @@ RUN rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=builder /usr/local/cargo/bin/name-lookup /usr/local/bin/name-lookup
+COPY --from=builder /usr/src/name-lookup/static /app/static
 
 EXPOSE 3000
 CMD ["name-lookup"]
