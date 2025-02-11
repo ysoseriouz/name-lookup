@@ -54,6 +54,7 @@ pub async fn initialize() -> Result<AppState> {
         .max_connections(5)
         .connect(&database_url)
         .await?;
+    sqlx::migrate!().run(&pool).await?;
     seed::seed_data(&pool, 0).await?;
     let bloom_filter = build_bloom_filter(&pool, 10_000_000).await?;
     let app_state = AppState {
