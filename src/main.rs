@@ -6,7 +6,7 @@ use axum::{
     body::Bytes,
     extract::{MatchedPath, State},
     http::{HeaderMap, Request},
-    response::Response,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
@@ -61,6 +61,7 @@ async fn main() -> Result<()> {
     let timeout_layer = TimeoutLayer::new(Duration::from_secs(10));
     let app = Router::new()
         .route("/", get(html_template::lookup::index))
+        .route("/_chk", get(health_check))
         .route("/lookup", post(html_template::lookup::add_name))
         .route("/joke", get(html_template::joke::index))
         .route("/joke/renew", get(html_template::joke::renew))
@@ -89,6 +90,10 @@ async fn main() -> Result<()> {
         .context("Error while starting server")?;
 
     Ok(())
+}
+
+async fn health_check() -> impl IntoResponse {
+    "OK"
 }
 
 async fn handler_404() -> html_template::HtmlError {
