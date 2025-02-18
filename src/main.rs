@@ -11,10 +11,9 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use axum_server::tls_rustls::RustlsConfig;
 use initializer::{initialize, AppState};
 use std::{net::SocketAddr, time::Duration};
-use tls::{redirect_http_to_https, Ports};
+use tls::{build_tls_config, redirect_http_to_https, Ports};
 use tokio::signal;
 use tower_http::{
     classify::ServerErrorsFailureClass, compression::CompressionLayer,
@@ -44,11 +43,7 @@ async fn main() -> Result<()> {
         http: 7878,
         https: 3000,
     };
-    let cert_path = dotenvy::var("CERT_PATH")?;
-    let key_path = dotenvy::var("KEY_PATH")?;
-    let config = RustlsConfig::from_pem_file(cert_path, key_path)
-        .await
-        .unwrap();
+    let tls_config = build_tls_config()?;
     let app_state = initialize().await?;
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|req: &Request<_>| {
@@ -83,14 +78,14 @@ async fn main() -> Result<()> {
         .layer(CompressionLayer::new())
         .with_state(app_state.clone())
         .fallback(handler_404);
-    let addr = SocketAddr::from(([127, 0, 0, 1], ports.https));
+    let addr = SocketAddr::from(([0, 0, 0, 0], ports.https));
     let handle = axum_server::Handle::new();
     let shutdown_future = shutdown_signal(handle.clone(), app_state.clone());
 
     tokio::spawn(redirect_http_to_https(ports, shutdown_future));
 
     debug!("listening on {addr}");
-    axum_server::bind_rustls(addr, config)
+    axum_server::bind_rustls(addr, tls_config)
         .handle(handle)
         .serve(app.into_make_service())
         .await
