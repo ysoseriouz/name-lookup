@@ -1,5 +1,6 @@
 mod html_template;
 mod initializer;
+mod tls;
 
 use anyhow::{Context, Result};
 use axum::{
@@ -10,15 +11,17 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use axum_server::tls_rustls::RustlsConfig;
 use initializer::{initialize, AppState};
-use std::time::Duration;
-use tokio::{net::TcpListener, signal};
+use std::{net::SocketAddr, time::Duration};
+use tls::{redirect_http_to_https, Ports};
+use tokio::signal;
 use tower_http::{
     classify::ServerErrorsFailureClass, compression::CompressionLayer,
     decompression::RequestDecompressionLayer, services::ServeDir, timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{error, info, info_span, Span};
+use tracing::{debug, error, info, info_span, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -37,7 +40,15 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("Initializing...");
+    let ports = Ports {
+        http: 7878,
+        https: 3000,
+    };
+    let cert_path = dotenvy::var("CERT_PATH")?;
+    let key_path = dotenvy::var("KEY_PATH")?;
+    let config = RustlsConfig::from_pem_file(cert_path, key_path)
+        .await
+        .unwrap();
     let app_state = initialize().await?;
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|req: &Request<_>| {
@@ -72,20 +83,16 @@ async fn main() -> Result<()> {
         .layer(CompressionLayer::new())
         .with_state(app_state.clone())
         .fallback(handler_404);
-    info!("Initialized!");
+    let addr = SocketAddr::from(([127, 0, 0, 1], ports.https));
+    let handle = axum_server::Handle::new();
+    let shutdown_future = shutdown_signal(handle.clone(), app_state.clone());
 
-    let mut listenfd = listenfd::ListenFd::from_env();
-    let listener = match listenfd.take_tcp_listener(0).unwrap() {
-        Some(listener) => {
-            listener.set_nonblocking(true)?;
-            TcpListener::from_std(listener)?
-        }
-        None => TcpListener::bind("0.0.0.0:3000").await?,
-    };
-    info!("Listening on {}", listener.local_addr()?);
+    tokio::spawn(redirect_http_to_https(ports, shutdown_future));
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal(app_state))
+    debug!("listening on {addr}");
+    axum_server::bind_rustls(addr, config)
+        .handle(handle)
+        .serve(app.into_make_service())
         .await
         .context("Error while starting server")?;
 
@@ -107,7 +114,7 @@ async fn save_state(state: AppState) {
     }
 }
 
-async fn shutdown_signal(state: AppState) {
+async fn shutdown_signal(handle: axum_server::Handle, state: AppState) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -129,4 +136,7 @@ async fn shutdown_signal(state: AppState) {
         _ = ctrl_c => save_state(state).await,
         _ = terminate => save_state(state).await,
     }
+
+    info!("Received termination signal shutting down");
+    handle.graceful_shutdown(Some(Duration::from_secs(10)));
 }
