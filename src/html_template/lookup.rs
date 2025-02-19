@@ -12,7 +12,7 @@ pub struct IndexTemplate;
 #[derive(Template)]
 #[template(path = "lookup/response.html")]
 pub struct ResponseTemplate<'a> {
-    message: &'a str,
+    message: String,
     text_color: &'a str,
 }
 
@@ -33,7 +33,7 @@ pub async fn add_name<'a>(
     let mut bloom_filter = state.bloom_filter.lock().await;
     let template = if bloom_filter.lookup(&request.name) {
         ResponseTemplate {
-            message: "Another name plz!",
+            message: format!("{} already exist!", &request.name),
             text_color: "text-red-800",
         }
     } else {
@@ -42,7 +42,7 @@ pub async fn add_name<'a>(
             .await
             .map_err(internal_error)?;
         ResponseTemplate {
-            message: "Noice!",
+            message: format!("{} added!", &request.name),
             text_color: "text-blue-800",
         }
     };
