@@ -8,7 +8,7 @@ use axum::extract::State;
 use initializer::{initialize, AppState};
 use router::router;
 use std::{net::SocketAddr, time::Duration};
-use tls::{build_tls_config, redirect_http_to_https, Ports};
+use tls::build_tls_config;
 use tokio::signal;
 use tracing::{debug, error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -16,22 +16,17 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or("TRACE".into()))
+        .with(EnvFilter::try_from_default_env().unwrap_or("DEBUG".into()))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let ports = Ports {
-        http: 7878,
-        https: 3000,
-    };
     let tls_config = build_tls_config()?;
     let app_state = initialize().await?;
     let app = router(app_state.clone());
-    let addr = SocketAddr::from(([0, 0, 0, 0], ports.https));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     let handle = axum_server::Handle::new();
-    let shutdown_future = shutdown_signal(handle.clone(), app_state.clone());
 
-    tokio::spawn(redirect_http_to_https(ports, shutdown_future));
+    tokio::spawn(shutdown_signal(handle.clone(), app_state));
 
     debug!("listening on {addr}");
     axum_server::bind_rustls(addr, tls_config)
