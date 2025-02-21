@@ -1,7 +1,11 @@
 mod app_state;
+mod logs;
 mod seed;
+mod tls;
 
 pub use app_state::AppState;
+pub use logs::setup_logs;
+pub use tls::build_tls_config;
 
 use anyhow::Result;
 use bloom_filter_yss::{BloomFilter, BloomFilterBuilder};

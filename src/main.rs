@@ -1,39 +1,18 @@
 mod html_template;
 mod initializer;
 mod router;
-mod tls;
 
 use anyhow::{Context, Result};
 use axum::extract::State;
-use initializer::{initialize, AppState};
+use initializer::{build_tls_config, initialize, setup_logs, AppState};
 use router::router;
 use std::{net::SocketAddr, time::Duration};
-use tls::build_tls_config;
 use tokio::signal;
 use tracing::{debug, error, info};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let log_file = tracing_appender::rolling::daily("logs", "app.log");
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or("DEBUG".into()))
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_writer(log_file)
-                .with_target(false)
-                .with_level(true)
-                .json()
-                .compact(),
-        )
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_target(false)
-                .with_level(true)
-                .json()
-                .compact(),
-        )
-        .init();
+    setup_logs();
 
     let tls_config = build_tls_config()?;
     let app_state = initialize().await?;
