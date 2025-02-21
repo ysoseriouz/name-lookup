@@ -9,8 +9,8 @@ use axum::{
 use tower::ServiceBuilder;
 use tower_http::{
     classify::ServerErrorsFailureClass, compression::CompressionLayer,
-    decompression::RequestDecompressionLayer, services::ServeDir, timeout::TimeoutLayer,
-    trace::TraceLayer,
+    decompression::RequestDecompressionLayer, request_id::MakeRequestUuid, services::ServeDir,
+    timeout::TimeoutLayer, trace::TraceLayer, ServiceBuilderExt,
 };
 use tracing::{error, info, info_span, Span};
 
@@ -21,8 +21,13 @@ use super::AppState;
 pub fn router(app_state: AppState) -> Router {
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|req: &Request<_>| {
+            let request_id = req
+                .headers()
+                .get("X-Request-Id")
+                .map_or("N/A", |v| v.to_str().unwrap_or("invalid"));
             info_span!(
                 "request",
+                request_id = request_id,
                 method = ?req.method(),
                 uri = ?req.uri(),
                 version = ?req.version(),
@@ -45,7 +50,9 @@ pub fn router(app_state: AppState) -> Router {
         );
     let timeout_layer = TimeoutLayer::new(Duration::from_secs(10));
     let service_layer = ServiceBuilder::new()
+        .set_x_request_id(MakeRequestUuid)
         .layer(trace_layer)
+        .propagate_x_request_id()
         .layer(timeout_layer)
         .layer(RequestDecompressionLayer::new())
         .layer(CompressionLayer::new());
