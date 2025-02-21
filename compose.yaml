@@ -9,6 +9,7 @@ services:
     ports:
       - 3000:443
     volumes:
+      - ./logs:/app/logs
       - local:/tmp
   db:
     image: postgres:17
