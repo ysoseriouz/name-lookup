@@ -23,11 +23,12 @@ RUN rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/target/release/name-lookup /usr/local/bin/name-lookup
 COPY --from=builder /app/static /app/static
+COPY public/ public/
 COPY ssl /etc/nginx/certs
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY entrypoint.sh entrypoint.sh
 RUN chmod +x entrypoint.sh
 
-EXPOSE 80 443
+EXPOSE 443
 
 CMD ["./entrypoint.sh"]

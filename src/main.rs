@@ -32,7 +32,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn save_state(state: AppState) {
+async fn shutdown(state: AppState) {
+    info!("Shutting down...");
     match state.save().await {
         Ok(_) => info!("Save app state successfully!"),
         Err(err) => error!(%err),
@@ -58,8 +59,8 @@ async fn shutdown_signal(handle: axum_server::Handle, state: AppState) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => save_state(state).await,
-        _ = terminate => save_state(state).await,
+        _ = ctrl_c => shutdown(state).await,
+        _ = terminate => shutdown(state).await,
     }
 
     info!("Received termination signal shutting down");

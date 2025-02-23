@@ -3,7 +3,7 @@ use std::time::Duration;
 use axum::{
     http::{Request, Response},
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, get_service, post},
     Router,
 };
 use tower::ServiceBuilder;
@@ -64,6 +64,7 @@ pub fn router(app_state: AppState) -> Router {
         .route("/joke", get(html_template::joke::index))
         .route("/joke/renew", get(html_template::joke::renew))
         .nest_service("/static", ServeDir::new("static"))
+        .nest_service("/public", get_service(ServeDir::new("public")))
         .layer(service_layer)
         .with_state(app_state.clone())
         .fallback(handler_404)

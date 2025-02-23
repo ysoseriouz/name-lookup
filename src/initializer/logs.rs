@@ -17,13 +17,7 @@ pub fn setup_logs() {
                 .json()
                 .compact(),
         )
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_target(false)
-                .with_level(true)
-                .json()
-                .compact(),
-        )
+        .with(tracing_subscriber::fmt::layer().with_level(true).compact())
         .init();
 
     tokio::spawn(rotate_logs());
