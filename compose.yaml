@@ -26,6 +26,10 @@ services:
     restart: always
     ports:
       - 8080:8080
+  cfar_tunnel:
+    build:
+      context: .
+      dockerfile: ./cloudflared/Dockerfile
 
 volumes:
   data:

@@ -6,3 +6,5 @@
 /static
 /ssl
 /logs
+cloudflared/credentials.json
+cloudflared/cert.pem
