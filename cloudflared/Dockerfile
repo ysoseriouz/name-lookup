@@ -10,4 +10,4 @@ COPY --chown=nonroot cloudflared/cert.pem cert.pem
 COPY --chown=nonroot cloudflared/credentials.json credentials.json
 COPY --chown=nonroot cloudflared/config.yml config.yml
 
-CMD ["tunnel", "--config", "config.yml", "run"]
+ENTRYPOINT ["cloudflared", "tunnel", "--config", "config.yml", "run"]
